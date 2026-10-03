@@ -231,7 +231,8 @@ def dashboard_snapshot(symbol:str="NIFTY"):
             "nse_message":"Live NSE data" if nd.get("is_live") else
                 ("Showing last successful NSE fetch" if nd.get("available") else "NSE data unavailable"),
             "support":nd.get("support"),"resistance":nd.get("resistance"),"max_pain":nd.get("max_pain")}
-\n@app.get("/health")
+
+@app.get("/health")
 def health():
     return {"ok":True,"auth_mode":"optional" if not C.API_TOKEN else "required","market_open":market_open(),"angel_connected":client.api is not None,"angel_message":state["angel_message"],"nse_mcp":"configured","last_update":state["last_update"],"error":state["error"],"nse_error":state["nse_error"],"nse_mcp_error":state["nse_mcp_error"]}
 
