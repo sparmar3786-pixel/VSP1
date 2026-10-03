@@ -230,7 +230,7 @@ jobs:
 
       - name: Validate Railway backend URL
         env:
-          RAILWAY_BACKEND_URL: ${{ vars.RAILWAY_BACKEND_URL || 'https://nse-algo-backend-production.up.railway.app' }}
+          RAILWAY_BACKEND_URL: ${{ vars.RAILWAY_BACKEND_URL || 'https://nse-algo-backend-live-production.up.railway.app' }}
         run: |
           python - <<'PY'
           import os
