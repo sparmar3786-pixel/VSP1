@@ -142,7 +142,7 @@ def _dashboard_nse(symbol):
     atm=min(strikes,key=lambda x:abs(x-float(spot))) if strikes and spot is not None else None
     trend=None
     if features:
-        trend=ai_model.label(ai_model.p_up(features)[0])
+        trend=label(p_up(features)[0])
     return {"available":True,"symbol":key,
             "source_status":"LIVE" if live else "LAST_FETCH","is_live":bool(live),
             "last_fetch_ts":ts,"age_sec":round(age,1) if age is not None else None,
