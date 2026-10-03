@@ -252,36 +252,36 @@ def angel_required():
         raise HTTPException(503,"Angel One is not connected. Connect from Angel API screen first.")
 
 @app.get("/v1/angel/commodities")
-def angel_commodities(x_token:str=Header(None)):
-    auth(x_token); angel_required()
+def angel_commodities(x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token); angel_required()
     try: return client.commodity_quotes()
     except Exception as e: raise HTTPException(502,str(e))
 
 @app.get("/v1/angel/indices")
-def angel_indices(x_token:str=Header(None)):
-    auth(x_token); angel_required()
+def angel_indices(x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token); angel_required()
     try: return client.index_catalog_quotes()
     except Exception as e: raise HTTPException(502,str(e))
 
 @app.get("/v1/angel/market")
-def angel_market(x_token:str=Header(None)):
-    auth(x_token); angel_required()
+def angel_market(x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token); angel_required()
     try:
         return client.index_quote()
     except Exception as e:
         raise HTTPException(502,str(e))
 
 @app.get("/v1/angel/candles")
-def angel_candles(exchange:str="NSE",token:str="99926000",interval:str="FIVE_MINUTE",days:int=1,x_token:str=Header(None)):
-    auth(x_token); angel_required()
+def angel_candles(exchange:str="NSE",token:str="99926000",interval:str="FIVE_MINUTE",days:int=1,x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token); angel_required()
     allowed={"ONE_MINUTE","THREE_MINUTE","FIVE_MINUTE","TEN_MINUTE","FIFTEEN_MINUTE","THIRTY_MINUTE","ONE_HOUR","ONE_DAY"}
     if interval not in allowed: raise HTTPException(400,"Unsupported interval")
     try: return client.candles(exchange,token,interval,days)
     except Exception as e: raise HTTPException(502,str(e))
 
 @app.get("/v1/option-chain")
-def unified_option_chain(symbol:str="NIFTY",count:int=10,x_token:str=Header(None)):
-    auth(x_token); angel_required()
+def unified_option_chain(symbol:str="NIFTY",count:int=10,x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token); angel_required()
     aliases={"NIFTY 50":"NIFTY","NIFTYBANK":"BANKNIFTY","BANK NIFTY":"BANKNIFTY","MIDCAP SELECT":"MIDCPNIFTY"}
     key=symbol.upper().replace(" ","")
     key=aliases.get(symbol.upper(), aliases.get(key,key))
@@ -293,8 +293,8 @@ def unified_option_chain(symbol:str="NIFTY",count:int=10,x_token:str=Header(None
         raise HTTPException(502,"Option chain unavailable: "+str(e))
 
 @app.get("/v1/angel/option-chain")
-def angel_option_chain(symbol:str="NIFTY",count:int=200,x_token:str=Header(None)):
-    auth(x_token); angel_required()
+def angel_option_chain(symbol:str="NIFTY",count:int=200,x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token); angel_required()
     allowed={"NIFTY","BANKNIFTY","FINNIFTY","MIDCPNIFTY","MIDCAPSELECT","SENSEX","BANKEX"}
     symbol=symbol.upper().replace(" ","")
     if symbol not in allowed: raise HTTPException(400,"Unsupported index")
@@ -321,46 +321,46 @@ def angel_option_chain(symbol:str="NIFTY",count:int=200,x_token:str=Header(None)
     except Exception as e: raise HTTPException(502,str(e))
 
 @app.get("/v1/angel/oi")
-def angel_oi(token:str,interval:str="THREE_MINUTE",hours:int=6,x_token:str=Header(None)):
-    auth(x_token); angel_required()
+def angel_oi(token:str,interval:str="THREE_MINUTE",hours:int=6,x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token); angel_required()
     try: return client.oi_history(token,interval,hours)
     except Exception as e: raise HTTPException(502,str(e))
 
 @app.get("/v1/angel/search")
-def angel_search(exchange:str="NSE",q:str="",x_token:str=Header(None)):
-    auth(x_token); angel_required()
+def angel_search(exchange:str="NSE",q:str="",x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token); angel_required()
     if not q.strip(): raise HTTPException(400,"Search query is required")
     try: return client.search(exchange,q.strip())
     except Exception as e: raise HTTPException(502,str(e))
 
 @app.get("/v1/angel/portfolio")
-def angel_portfolio(x_token:str=Header(None)):
-    auth(x_token); angel_required()
+def angel_portfolio(x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token); angel_required()
     try: return client.portfolio()
     except Exception as e: raise HTTPException(502,str(e))
 
 @app.get("/v1/angel/gainers-losers")
-def angel_gainers_losers(datatype:str="PercPriceGainers",expirytype:str="NEAR",x_token:str=Header(None)):
-    auth(x_token); angel_required()
+def angel_gainers_losers(datatype:str="PercPriceGainers",expirytype:str="NEAR",x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token); angel_required()
     try: return client.gainers_losers(datatype,expirytype)
     except Exception as e: raise HTTPException(502,str(e))
 
 @app.get("/v1/angel/oi-buildup")
-def angel_oi_buildup(datatype:str="Long Built Up",expirytype:str="NEAR",x_token:str=Header(None)):
-    auth(x_token); angel_required()
+def angel_oi_buildup(datatype:str="Long Built Up",expirytype:str="NEAR",x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token); angel_required()
     try: return client.oi_buildup(datatype,expirytype)
     except Exception as e: raise HTTPException(502,str(e))
 
 @app.get("/v1/angel/greeks")
-def angel_greeks(name:str="NIFTY",expiry:str="",x_token:str=Header(None)):
-    auth(x_token); angel_required()
+def angel_greeks(name:str="NIFTY",expiry:str="",x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token); angel_required()
     if not expiry: raise HTTPException(400,"Expiry is required")
     try: return client.option_greeks(name,expiry)
     except Exception as e: raise HTTPException(502,str(e))
 
 @app.get("/v1/mcp/status")
-def mcp_status(x_token:str=Header(None)):
-    auth(x_token)
+def mcp_status(x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token)
     return {
         "market_mcp":{"mounted":True,"endpoint":"/mcp","auth":"x-mcp-token or Bearer"},
         "strategy_mcp":{"mounted":True,"endpoint":"/mcp-strategy","auth":"x-mcp-token or Bearer"},
@@ -369,8 +369,8 @@ def mcp_status(x_token:str=Header(None)):
     }
 
 @app.get("/v1/nse/mcp/tools")
-def nse_mcp_tools(x_token:str=Header(None)):
-    auth(x_token)
+def nse_mcp_tools(x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token)
     try:
         tools=nse_mcp.tools()
         state["nse_mcp_checked"]=True
@@ -382,8 +382,8 @@ def nse_mcp_tools(x_token:str=Header(None)):
         raise HTTPException(502,"NSE MCP unavailable")
 
 @app.get("/v1/nse/mcp/context")
-def nse_mcp_context(symbol:str="NIFTY",x_token:str=Header(None)):
-    auth(x_token)
+def nse_mcp_context(symbol:str="NIFTY",x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token)
     try:
         data=nse_mcp.context(symbol.upper())
         state["nse_mcp_checked"]=True
@@ -394,8 +394,8 @@ def nse_mcp_context(symbol:str="NIFTY",x_token:str=Header(None)):
         state["nse_mcp_error"]=str(e)
         return {"connected":False,"endpoint":nse_mcp.url,"tool_count":0,"tools":[],"data":[],"error":str(e)[:500]}
 @app.get("/v1/nse/option-chain.csv")
-def nse_option_chain_csv(symbol:str="NIFTY",expiry:Optional[str]=None,x_token:str=Header(None)):
-    auth(x_token)
+def nse_option_chain_csv(symbol:str="NIFTY",expiry:Optional[str]=None,x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token)
     try:
         tool,result=nse_mcp.option_chain(symbol.upper(),expiry)
         state["nse_mcp_error"]=None
@@ -413,13 +413,13 @@ def _strategy_refresh(index: str = "NIFTY"):
     return strategy_state(client, eng, index)
 
 @app.get("/v1/strategy/refresh")
-def strategy_refresh(index:str="NIFTY",x_token:str=Header(None)):
-    auth(x_token)
+def strategy_refresh(index:str="NIFTY",x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token)
     return _strategy_refresh(index)
 
 @app.get("/v1/ai/context")
-def ai_context(index:str="NIFTY",x_token:str=Header(None)):
-    auth(x_token)
+def ai_context(index:str="NIFTY",x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token)
     terminal=terminal_snapshot()
     try:
         mcp=nse_mcp.context(index.upper())
