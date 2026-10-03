@@ -1,5 +1,6 @@
 name: Build Parmar Trading APK
 on:
+  workflow: build-apk
   push:
     branches: [main]
   workflow_dispatch:
