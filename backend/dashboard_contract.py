@@ -7,6 +7,8 @@ NSE_DASH_INDEXES = (
     {"symbol": "MIDCPNIFTY", "name": "NIFTY Midcap Select", "exchange": "NSE"},
     {"symbol": "NIFTYNEXT50", "name": "NIFTY Next 50", "exchange": "NSE"},
     {"symbol": "NIFTYFPI150", "name": "NIFTY India FPI 150", "exchange": "NSE"},
+)
+BSE_DASH_INDEXES = (
     {"symbol": "SENSEX", "name": "SENSEX", "exchange": "BSE"},
     {"symbol": "BANKEX", "name": "BANKEX", "exchange": "BSE"},
 )
