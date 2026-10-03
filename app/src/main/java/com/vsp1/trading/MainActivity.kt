@@ -57,7 +57,6 @@ private fun Header() {
             Text("VSP1", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Text("NSE AI TERMINAL", color = Muted, fontSize = 11.sp)
         }
-        AssistChip(onClick = {}, label = { Text(TerminalTabs.modeLabel, fontSize = 10.sp) })
         Spacer(Modifier.width(8.dp))
         Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Muted)
     }
@@ -82,7 +81,7 @@ private fun TerminalScreen(tab: TerminalTab, index: Int) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(tab.title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                Text("Screen ${index + 1}  •  PAPER / DEMO", color = Muted, fontSize = 12.sp)
+                Text("Screen ${index + 1}", color = Muted, fontSize = 12.sp)
             }
             Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Accent)
         }
