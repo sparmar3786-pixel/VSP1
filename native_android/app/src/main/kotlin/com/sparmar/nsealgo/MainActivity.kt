@@ -61,6 +61,7 @@ class MainActivity : AppCompatActivity() {
 
         content.addView(Button(this).apply { text = "CONNECT ANGEL ONE LIVE"; setOnClickListener { saveAndConnect() } })
         content.addView(Button(this).apply { text = "REFRESH STATUS"; setOnClickListener { health() } })
+        content.addView(Button(this).apply { text = "AI VALIDATE SIGNAL"; setOnClickListener { validateAi() } })
         content.addView(label("INDEX DATA", 18))
         val tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         tabs.addView(Button(this).apply { text = "NSE / BSE"; setOnClickListener { selectedExchange = "NSE"; loadIndexes() } }, LinearLayout.LayoutParams(0, -2, 1f))
@@ -125,6 +126,33 @@ class MainActivity : AppCompatActivity() {
                         status.text = "Angel: REJECTED • " + msg
                     }
                 }
+            }
+        })
+    }
+
+    private fun validateAi() {
+        val h = headers()
+        val get = Request.Builder().url(baseUrl() + "/v1/terminal").headers(h).get().build()
+        status.text = "AI: validating supplied market evidence..."
+        http.newCall(get).enqueue(object : Callback {
+            override fun onFailure(call: Call, ex: java.io.IOException) { runOnUiThread { status.text = "AI: unavailable • WAIT safe state" } }
+            override fun onResponse(call: Call, response: Response) {
+                val raw = response.body?.string().orEmpty()
+                if (!response.isSuccessful) { runOnUiThread { status.text = "AI: terminal evidence unavailable • WAIT" }; return }
+                val body = JSONObject().put("payload", JSONObject(raw)).toString()
+                val req = Request.Builder().url(baseUrl() + "/v1/ai/validate").headers(h).post(body.toRequestBody("application/json".toMediaType())).build()
+                http.newCall(req).enqueue(object : Callback {
+                    override fun onFailure(call: Call, ex: java.io.IOException) { runOnUiThread { status.text = "AI: unavailable • WAIT safe state" } }
+                    override fun onResponse(call: Call, aiResponse: Response) {
+                        val aiRaw = aiResponse.body?.string().orEmpty()
+                        val j = runCatching { JSONObject(aiRaw) }.getOrNull()
+                        runOnUiThread {
+                            val finalState = j?.optString("final", "WAIT") ?: "WAIT"
+                            val verified = j?.optBoolean("cross_verified", false) == true
+                            status.text = "AI: " + finalState + if (verified) " • cross-verified" else " • local/safe fallback"
+                        }
+                    }
+                })
             }
         })
     }
