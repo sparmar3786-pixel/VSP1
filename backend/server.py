@@ -21,6 +21,7 @@ from strategy_store import save_oi_snapshot
 from strategy_mcp_server import mount_strategy_mcp
 from engine_contract import engine_state, strategy_state
 from angel_data_layer import build_ai_read
+from dashboard_contract import MCX_DASH_INDEXES, NSE_DASH_INDEXES, _dashboard_chain, _dashboard_symbol
 
 app=FastAPI(title="NSE Algo Signal API"); app.add_middleware(GZipMiddleware,minimum_size=1024); app.include_router(strategy_router); app.include_router(market_core_router); app.include_router(council_router); app.include_router(alert_router); eng=Engine(); client=AngelClient(); nse=NSEClient(); nse_mcp=NSEMCP()
 state={"error":None,"nse_error":None,"last_update":None,"angel_message":"Not connected","nse_mcp_error":None,"nse_mcp_checked":False}
@@ -112,39 +113,6 @@ def auth(x_token: str = None, x_app_key: str = None):
             },
         )
 
-
-def _dashboard_symbol(symbol: str) -> str:
-    s=str(symbol or "NIFTY").upper().replace(" ","").replace("-","")
-    aliases={"NIFTY50":"NIFTY","NIFTYBANK":"BANKNIFTY","BANKNIFTY":"BANKNIFTY",
-             "MIDCAPSELECT":"MIDCPNIFTY","NIFTYFINANCIALSERVICES":"FINNIFTY"}
-    return aliases.get(s,s)
-
-NSE_DASH_INDEXES=(
-    {"symbol":"NIFTY","name":"NIFTY 50","exchange":"NSE"},
-    {"symbol":"BANKNIFTY","name":"NIFTY Bank","exchange":"NSE"},
-    {"symbol":"FINNIFTY","name":"NIFTY Financial Services","exchange":"NSE"},
-    {"symbol":"MIDCPNIFTY","name":"NIFTY Midcap Select","exchange":"NSE"},
-    {"symbol":"NIFTYNEXT50","name":"NIFTY Next 50","exchange":"NSE"},
-    {"symbol":"NIFTYFPI150","name":"NIFTY India FPI 150","exchange":"NSE"},
-    {"symbol":"SENSEX","name":"SENSEX","exchange":"BSE"},
-    {"symbol":"BANKEX","name":"BANKEX","exchange":"BSE"},
-)
-MCX_DASH_INDEXES=(
-    {"symbol":"MCXBULLDEX","name":"MCX BULLDEX","exchange":"MCX"},
-    {"symbol":"MCXMETLDEX","name":"MCX METLDEX","exchange":"MCX"},
-    {"symbol":"MCXENRGDEX","name":"MCX ENRGDEX","exchange":"MCX"},
-)
-nse_dashboard_cache={}
-nse_dashboard_lock=threading.RLock()
-
-def _dashboard_chain(payload):
-    rows=[]
-    for r in payload.get("rows",[]) or []:
-        ce=r.get("ce",{}); pe=r.get("pe",{})
-        rows.append({"strike":r.get("strike"),
-                     "ce":{"oi":ce.get("oi",0),"oi_chg":ce.get("chg_oi",0),"ltp":ce.get("ltp",0)},
-                     "pe":{"oi":pe.get("oi",0),"oi_chg":pe.get("chg_oi",0),"ltp":pe.get("ltp",0)}})
-    return rows
 
 def _dashboard_nse(symbol):
     key=_dashboard_symbol(symbol)

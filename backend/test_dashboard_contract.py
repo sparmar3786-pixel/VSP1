@@ -2,7 +2,7 @@ import sys
 sys.path.insert(0, "backend")
 import unittest
 
-from server import _dashboard_symbol, _dashboard_chain
+from dashboard_contract import _dashboard_chain, _dashboard_symbol
 
 
 class DashboardContractTests(unittest.TestCase):
