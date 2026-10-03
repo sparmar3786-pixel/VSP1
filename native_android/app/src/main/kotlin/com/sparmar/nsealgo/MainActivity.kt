@@ -49,7 +49,7 @@ class MainActivity : AppCompatActivity() {
         status = label("Backend: checking...", 15)
         content.addView(status)
 
-        backend = field("Backend URL", prefs.getString("backend", "https://nse-algo-backend-production.up.railway.app") ?: "")
+        backend = field("Backend URL", prefs.getString("backend", "https://nse-algo-backend-live-production.up.railway.app") ?: "")
         content.addView(backend)
 
         content.addView(label("ANGEL ONE SMARTAPI", 18))
