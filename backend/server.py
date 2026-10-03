@@ -101,9 +101,9 @@ def nse_loop():
         except Exception as e: state["nse_error"]=str(e)
         time.sleep(C.NSE_POLL_SEC)
 
-def auth(x_token: str = None, x_app_key: str = None):
+def auth(x_token: str = None, x_app_key: str = None, x_dash_token: str = None):
     expected = (C.API_TOKEN or "").strip()
-    provided = (x_token or x_app_key or "").strip()
+    provided = (x_token or x_app_key or x_dash_token or "").strip()
     if expected and provided != expected:
         raise HTTPException(
             401,
@@ -196,8 +196,8 @@ def health():
 
 @app.post("/v1/angel/login")
 @app.post("/angel/login")
-def angel_login(body:AngelLoginRequest,x_token:str=Header(None),x_app_key:str=Header(None)):
-    auth(x_token,x_app_key)
+def angel_login(body:AngelLoginRequest,x_token:str=Header(None),x_app_key:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,x_app_key,x_dash_token)
     client_code=body.client_code
     if not client_code: raise HTTPException(400,"Client ID is required.")
     if len(body.totp)!=6 or not body.totp.isdigit(): raise HTTPException(400,"TOTP must be the current 6-digit code.")
@@ -223,8 +223,8 @@ def angel_login(body:AngelLoginRequest,x_token:str=Header(None),x_app_key:str=He
 
 @app.get("/v1/angel/status")
 @app.get("/angel/status")
-def angel_status(x_token:str=Header(None),x_app_key:str=Header(None)):
-    auth(x_token,x_app_key); return {"connected":client.api is not None,"message":state["angel_message"],"last_update":state["last_update"],"error":state["error"]}
+def angel_status(x_token:str=Header(None),x_app_key:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,x_app_key,x_dash_token); return {"connected":client.api is not None,"message":state["angel_message"],"last_update":state["last_update"],"error":state["error"]}
 @app.websocket("/v1/ws")
 async def native_market_websocket(websocket: WebSocket):
     token = (websocket.query_params.get("token") or "").strip()
@@ -451,8 +451,8 @@ def ai_context(index:str="NIFTY",x_token:str=Header(None)):
         "max_pain":strategy.get("max_pain")
     },"ai_rule":"Reconcile Angel API + official NSE MCP + Internet evidence. Missing or conflicting evidence forces WAIT."}
 @app.post("/v1/ai/validate")
-def ai_validate(body:AIValidationRequest,x_token:str=Header(None)):
-    auth(x_token)
+def ai_validate(body:AIValidationRequest,x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token)
     payload=body.payload if isinstance(body.payload,dict) else {}
     try:
         return validate_all(payload)
@@ -462,19 +462,19 @@ def ai_validate(body:AIValidationRequest,x_token:str=Header(None)):
                 "local_fallback":{"status":"error_local","text":str(e)[:300]}}
 
 @app.get("/v1/diagnostics")
-def diagnostics(x_token:str=Header(None)):
-    auth(x_token); providers=ai_status(x_token)["providers"]; ev=getattr(eng,"strategy_evidence",[]) if hasattr(eng,"strategy_evidence") else []
+def diagnostics(x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token); providers=ai_status(x_token)["providers"]; ev=getattr(eng,"strategy_evidence",[]) if hasattr(eng,"strategy_evidence") else []
     return {"angel":{"connected":client.api is not None,"message":state["angel_message"]},"nse":{"available":state["nse_error"] is None,"error":state["nse_error"]},"ai":{"configured":sum(1 for p in providers if p["configured"]),"providers":providers},"strategies":{"registered":len(ev),"evaluated":len(ev),"active":sum(1 for x in ev if isinstance(x,dict) and x.get("state")=="active"),"unavailable":sum(1 for x in ev if isinstance(x,dict) and x.get("state")=="unavailable"),"not_evaluated":0}}
 
 @app.get("/v1/audit/latest")
-def latest_audit(x_token:str=Header(None)):
-    auth(x_token); last=eng.last if isinstance(eng.last,dict) else {}; return {"action":last.get("action","WAIT"),"reasons":last.get("reasons",[]),"timestamp":state["last_update"]}
+def latest_audit(x_token:str=Header(None),x_dash_token:str=Header(None)):
+    auth(x_token,None,x_dash_token); last=eng.last if isinstance(eng.last,dict) else {}; return {"action":last.get("action","WAIT"),"reasons":last.get("reasons",[]),"timestamp":state["last_update"]}
 
 @app.get("/signal")
-def signal(x_token:str=Header(None)): auth(x_token); return terminal_snapshot()
+def signal(x_token:str=Header(None),x_dash_token:str=Header(None)): auth(x_token,None,x_dash_token); return terminal_snapshot()
 
 @app.get("/v1/terminal")
-def terminal_snapshot_endpoint(x_token:str=Header(None)): auth(x_token); return terminal_snapshot()
+def terminal_snapshot_endpoint(x_token:str=Header(None),x_dash_token:str=Header(None)): auth(x_token,None,x_dash_token); return terminal_snapshot()
 
 def terminal_snapshot():
     last=eng.last if isinstance(eng.last,dict) else {}
