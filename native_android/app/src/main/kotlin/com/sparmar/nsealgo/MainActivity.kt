@@ -18,7 +18,6 @@ class MainActivity : AppCompatActivity() {
     private var socket: WebSocket? = null
     private lateinit var status: TextView
     private lateinit var backend: EditText
-    private lateinit var appToken: EditText
     private lateinit var clientId: EditText
     private lateinit var pin: EditText
     private lateinit var totp: EditText
@@ -44,10 +43,8 @@ class MainActivity : AppCompatActivity() {
         status = label("Backend: checking...", 15)
         content.addView(status)
 
-        backend = field("Backend URL", prefs.getString("backend", "https://vandana1-angel-api.onrender.com") ?: "")
-        appToken = field("Terminal App Token (optional)", prefs.getString("appToken", "") ?: "")
+        backend = field("Backend URL", prefs.getString("backend", "https://nse-algo-backend-production.up.railway.app") ?: "")
         content.addView(backend)
-        content.addView(appToken)
 
         content.addView(label("ANGEL ONE SMARTAPI", 18))
         clientId = field("Client ID", prefs.getString("clientId", "") ?: "")
@@ -85,13 +82,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun baseUrl(): String = backend.text.toString().trim().trimEnd('/')
 
-    private fun headers(): Headers {
-        val token = appToken.text.toString().trim()
-        return Headers.Builder().apply { if (token.isNotEmpty()) add("x-app-key", token) }.build()
-    }
+    private fun headers(): Headers = Headers.Builder().build()
 
     private fun saveAndConnect() {
-        prefs.edit().putString("backend", baseUrl()).putString("appToken", appToken.text.toString().trim()).putString("clientId", clientId.text.toString().trim()).apply()
+        prefs.edit().putString("backend", baseUrl()).putString("clientId", clientId.text.toString().trim()).apply()
         val body = JSONObject().put("clientId", clientId.text.toString().trim()).put("pin", pin.text.toString().trim()).put("totp", totp.text.toString().trim()).put("apiKey", apiKey.text.toString().trim()).toString()
         status.text = "Backend: connecting to Angel One..."
         val req = Request.Builder().url(baseUrl() + "/v1/angel/login").headers(headers()).post(body.toRequestBody("application/json".toMediaType())).build()
@@ -137,9 +131,7 @@ class MainActivity : AppCompatActivity() {
         socket?.close(1000, "reconnect")
         val scheme = if (baseUrl().startsWith("https://")) "wss://" else "ws://"
         val host = baseUrl().removePrefix("https://").removePrefix("http://")
-        val token = appToken.text.toString().trim()
-        val encoded = java.net.URLEncoder.encode(token, "UTF-8")
-        val url = scheme + host + "/v1/ws" + if (token.isNotEmpty()) "?token=" + encoded else ""
+        val url = scheme + host + "/v1/ws"
         socket = http.newWebSocket(Request.Builder().url(url).build(), object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) { runOnUiThread { status.text = "Backend: CONNECTED • Market stream: LIVE" } }
             override fun onMessage(webSocket: WebSocket, text: String) {
