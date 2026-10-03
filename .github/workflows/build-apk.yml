@@ -1,6 +1,8 @@
 name: Build Parmar Trading APK
+concurrency:
+  group: vsp1-flutter-${{ github.ref }}
+  cancel-in-progress: true
 on:
-  workflow: build-apk
   push:
     branches: [main]
   workflow_dispatch:
