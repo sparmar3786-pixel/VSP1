@@ -1,6 +1,7 @@
 name: Build Native Android APK
 
 on:
+  workflow: build-native-apk
   push:
     branches:
       - native-android-live-terminal
