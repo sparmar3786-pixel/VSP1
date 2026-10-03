@@ -25,6 +25,22 @@ from angel_data_layer import build_ai_read
 app=FastAPI(title="NSE Algo Signal API"); app.add_middleware(GZipMiddleware,minimum_size=1024); app.include_router(strategy_router); app.include_router(market_core_router); app.include_router(council_router); app.include_router(alert_router); eng=Engine(); client=AngelClient(); nse=NSEClient(); nse_mcp=NSEMCP()
 state={"error":None,"nse_error":None,"last_update":None,"angel_message":"Not connected","nse_mcp_error":None,"nse_mcp_checked":False}
 prev_chain={"c":None}; workers_started=False; last_oi_save=0.0
+nse_dashboard_cache={}; nse_dashboard_lock=threading.RLock()
+NSE_DASH_INDEXES=(
+    {"symbol":"NIFTY","name":"NIFTY 50","exchange":"NSE"},
+    {"symbol":"BANKNIFTY","name":"NIFTY Bank","exchange":"NSE"},
+    {"symbol":"FINNIFTY","name":"NIFTY Financial Services","exchange":"NSE"},
+    {"symbol":"MIDCPNIFTY","name":"NIFTY Midcap Select","exchange":"NSE"},
+    {"symbol":"NIFTYNEXT50","name":"NIFTY Next 50","exchange":"NSE"},
+    {"symbol":"NIFTYFPI150","name":"NIFTY India FPI 150","exchange":"NSE"},
+    {"symbol":"SENSEX","name":"SENSEX","exchange":"BSE"},
+    {"symbol":"BANKEX","name":"BANKEX","exchange":"BSE"},
+)
+MCX_DASH_INDEXES=(
+    {"symbol":"MCXBULLDEX","name":"MCX BULLDEX","exchange":"MCX"},
+    {"symbol":"MCXMETLDEX","name":"MCX METLDEX","exchange":"MCX"},
+    {"symbol":"MCXENRGDEX","name":"MCX ENRGDEX","exchange":"MCX"},
+)
 
 # Two read-only MCP servers live in this same Railway/Fly process.
 # /mcp serves the shared market snapshot; /mcp-strategy serves strategy evidence/backtests.
@@ -111,7 +127,111 @@ def auth(x_token: str = None, x_app_key: str = None):
             },
         )
 
-@app.get("/health")
+
+def _dashboard_symbol(symbol: str) -> str:
+    s=str(symbol or "NIFTY").upper().replace(" ","").replace("-","")
+    aliases={"NIFTY50":"NIFTY","NIFTYBANK":"BANKNIFTY","BANKNIFTY":"BANKNIFTY",
+             "MIDCAPSELECT":"MIDCPNIFTY","NIFTYFINANCIALSERVICES":"FINNIFTY"}
+    return aliases.get(s,s)
+
+NSE_DASH_INDEXES=(
+    {"symbol":"NIFTY","name":"NIFTY 50","exchange":"NSE"},
+    {"symbol":"BANKNIFTY","name":"NIFTY Bank","exchange":"NSE"},
+    {"symbol":"FINNIFTY","name":"NIFTY Financial Services","exchange":"NSE"},
+    {"symbol":"MIDCPNIFTY","name":"NIFTY Midcap Select","exchange":"NSE"},
+    {"symbol":"NIFTYNEXT50","name":"NIFTY Next 50","exchange":"NSE"},
+    {"symbol":"NIFTYFPI150","name":"NIFTY India FPI 150","exchange":"NSE"},
+    {"symbol":"SENSEX","name":"SENSEX","exchange":"BSE"},
+    {"symbol":"BANKEX","name":"BANKEX","exchange":"BSE"},
+)
+MCX_DASH_INDEXES=(
+    {"symbol":"MCXBULLDEX","name":"MCX BULLDEX","exchange":"MCX"},
+    {"symbol":"MCXMETLDEX","name":"MCX METLDEX","exchange":"MCX"},
+    {"symbol":"MCXENRGDEX","name":"MCX ENRGDEX","exchange":"MCX"},
+)
+nse_dashboard_cache={}
+nse_dashboard_lock=threading.RLock()
+
+def _dashboard_chain(payload):
+    rows=[]
+    for r in payload.get("rows",[]) or []:
+        ce=r.get("ce",{}); pe=r.get("pe",{})
+        rows.append({"strike":r.get("strike"),
+                     "ce":{"oi":ce.get("oi",0),"oi_chg":ce.get("chg_oi",0),"ltp":ce.get("ltp",0)},
+                     "pe":{"oi":pe.get("oi",0),"oi_chg":pe.get("chg_oi",0),"ltp":pe.get("ltp",0)}})
+    return rows
+
+def _dashboard_nse(symbol):
+    key=_dashboard_symbol(symbol)
+    live=None; error=None
+    if key in {"NIFTY","BANKNIFTY","FINNIFTY","MIDCPNIFTY"} and market_open():
+        try:
+            live=nse.fetch(key)
+            with nse_dashboard_lock:
+                nse_dashboard_cache[key]=live
+        except Exception as ex:
+            error=str(ex)[:300]
+    with nse_dashboard_lock:
+        cached=nse_dashboard_cache.get(key)
+    payload=live or cached
+    if not payload:
+        return {"available":False,"symbol":key,"source_status":"UNAVAILABLE","is_live":False,
+                "last_fetch_ts":None,"age_sec":None,"error":error,"chain":[]}
+    ts=float(payload.get("ts") or 0)
+    age=max(0.0,time.time()-ts) if ts else None
+    features=None
+    try:
+        features=nse_features.compute(payload,None)
+    except Exception:
+        pass
+    spot=payload.get("spot")
+    strikes=[float(r["strike"]) for r in payload.get("rows",[]) if r.get("strike") is not None]
+    atm=min(strikes,key=lambda x:abs(x-float(spot))) if strikes and spot is not None else None
+    trend=None
+    if features:
+        trend=ai_model.label(ai_model.p_up(features)[0])
+    return {"available":True,"symbol":key,
+            "source_status":"LIVE" if live else "LAST_FETCH","is_live":bool(live),
+            "last_fetch_ts":ts,"age_sec":round(age,1) if age is not None else None,
+            "error":error,"spot":spot,"expiry":payload.get("expiry"),"atm":atm,
+            "pcr":features.get("pcr_oi") if features else None,"trend":trend,
+            "support":features.get("_support") if features else None,
+            "resistance":features.get("_resistance") if features else None,
+            "max_pain":features.get("_maxpain") if features else None,
+            "chain":_dashboard_chain(payload)}
+
+@app.get("/api/indexes")
+def dashboard_indexes():
+    return {"default_exchange":"NSE","default_symbol":"NIFTY",
+            "exchanges":{"NSE":list(NSE_DASH_INDEXES),"MCX":list(MCX_DASH_INDEXES)}}
+
+@app.get("/api/snapshot")
+def dashboard_snapshot(symbol:str="NIFTY"):
+    key=_dashboard_symbol(symbol)
+    if key.startswith("MCX"):
+        return {"ts":time.time(),"symbol":key,"exchange":"MCX","underlying_ltp":None,
+                "source_status":"INDEX_CATALOG","is_live":False,"last_nse_fetch_ts":None,
+                "last_nse_fetch_age_sec":None,"nse_message":"MCX index selected; NSE fallback is not applicable.",
+                "chain":[]}
+    nd=_dashboard_nse(key)
+    base=terminal_snapshot() if key==_dashboard_symbol(C.SYMBOL) else {}
+    sig=base.get("signals") if isinstance(base,dict) else None
+    return {"ts":time.time(),"symbol":key,"exchange":"NSE","underlying_ltp":nd.get("spot"),
+            "atm":nd.get("atm"),"pcr":nd.get("pcr"),"trend":nd.get("trend") or "DATA UNAVAILABLE",
+            "signal":({"status":sig.get("action","WAIT"),"side":sig.get("type"),
+                       "option_symbol":sig.get("optionSymbol"),"strike":sig.get("strike"),
+                       "entry":sig.get("entry"),"stop_loss":sig.get("sl"),"target":sig.get("target"),
+                       "option_ltp":sig.get("ltp"),"reason":"; ".join(sig.get("reasons",[])[:2])}
+                      if isinstance(sig,dict) else None),
+            "chain":nd.get("chain",[]),"market":{"open":market_open()},
+            "engine":{"status":"LIVE" if nd.get("is_live") else "LAST FETCH"},
+            "source_status":nd.get("source_status"),"is_live":nd.get("is_live",False),
+            "last_nse_fetch_ts":nd.get("last_fetch_ts"),
+            "last_nse_fetch_age_sec":nd.get("age_sec"),"nse_error":nd.get("error"),
+            "nse_message":"Live NSE data" if nd.get("is_live") else
+                ("Showing last successful NSE fetch" if nd.get("available") else "NSE data unavailable"),
+            "support":nd.get("support"),"resistance":nd.get("resistance"),"max_pain":nd.get("max_pain")}
+\n@app.get("/health")
 def health():
     return {"ok":True,"auth_mode":"optional" if not C.API_TOKEN else "required","market_open":market_open(),"angel_connected":client.api is not None,"angel_message":state["angel_message"],"nse_mcp":"configured","last_update":state["last_update"],"error":state["error"],"nse_error":state["nse_error"],"nse_mcp_error":state["nse_mcp_error"]}
 
