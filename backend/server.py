@@ -21,7 +21,7 @@ from strategy_store import save_oi_snapshot
 from strategy_mcp_server import mount_strategy_mcp
 from engine_contract import engine_state, strategy_state
 from angel_data_layer import build_ai_read
-from dashboard_contract import MCX_DASH_INDEXES, NSE_DASH_INDEXES, _dashboard_chain, _dashboard_symbol
+from dashboard_contract import BSE_DASH_INDEXES, MCX_DASH_INDEXES, NSE_DASH_INDEXES, _dashboard_chain, _dashboard_symbol
 
 app=FastAPI(title="NSE Algo Signal API"); app.add_middleware(GZipMiddleware,minimum_size=1024); app.include_router(strategy_router); app.include_router(market_core_router); app.include_router(council_router); app.include_router(alert_router); eng=Engine(); client=AngelClient(); nse=NSEClient(); nse_mcp=NSEMCP()
 state={"error":None,"nse_error":None,"last_update":None,"angel_message":"Not connected","nse_mcp_error":None,"nse_mcp_checked":False}
@@ -156,7 +156,7 @@ def _dashboard_nse(symbol):
 @app.get("/api/indexes")
 def dashboard_indexes():
     return {"default_exchange":"NSE","default_symbol":"NIFTY",
-            "exchanges":{"NSE":list(NSE_DASH_INDEXES),"MCX":list(MCX_DASH_INDEXES)}}
+            "exchanges":{"NSE":list(NSE_DASH_INDEXES),"BSE":list(BSE_DASH_INDEXES),"MCX":list(MCX_DASH_INDEXES)}}
 
 @app.get("/api/snapshot")
 def dashboard_snapshot(symbol:str="NIFTY"):
@@ -164,12 +164,17 @@ def dashboard_snapshot(symbol:str="NIFTY"):
     if key.startswith("MCX"):
         return {"ts":time.time(),"symbol":key,"exchange":"MCX","underlying_ltp":None,
                 "source_status":"INDEX_CATALOG","is_live":False,"last_nse_fetch_ts":None,
-                "last_nse_fetch_age_sec":None,"nse_message":"MCX index selected; NSE fallback is not applicable.",
+                "last_nse_fetch_age_sec":None,"nse_message":"MCX index selected; MCX feed is required for live values.",
+                "chain":[]}
+    if key in {item["symbol"] for item in BSE_DASH_INDEXES}:
+        return {"ts":time.time(),"symbol":key,"exchange":"BSE","underlying_ltp":None,
+                "source_status":"INDEX_CATALOG","is_live":False,"last_nse_fetch_ts":None,
+                "last_nse_fetch_age_sec":None,"nse_message":"BSE index selected; BSE market feed is required for live values.",
                 "chain":[]}
     nd=_dashboard_nse(key)
     base=terminal_snapshot() if key==_dashboard_symbol(C.SYMBOL) else {}
     sig=base.get("signals") if isinstance(base,dict) else None
-    return {"ts":time.time(),"symbol":key,"exchange":"NSE","underlying_ltp":nd.get("spot"),
+    return {"ts":time.time(),"symbol":key,"exchange":nd.get("exchange","NSE"),"underlying_ltp":nd.get("spot"),
             "atm":nd.get("atm"),"pcr":nd.get("pcr"),"trend":nd.get("trend") or "DATA UNAVAILABLE",
             "signal":({"status":sig.get("action","WAIT"),"side":sig.get("type"),
                        "option_symbol":sig.get("optionSymbol"),"strike":sig.get("strike"),
