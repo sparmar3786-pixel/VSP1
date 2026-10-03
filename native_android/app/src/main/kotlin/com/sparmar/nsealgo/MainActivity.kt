@@ -23,11 +23,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var totp: EditText
     private lateinit var apiKey: EditText
     private lateinit var snapshot: TextView
+    private lateinit var indexSelector: Spinner
+    private lateinit var nseStatus: TextView
+    private val indexSymbols = mutableListOf<String>()
+    private val indexNames = mutableListOf<String>()
+    private var selectedExchange = "NSE"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         buildUi()
         health()
+        loadIndexes()
     }
 
     private fun buildUi() {
@@ -55,6 +61,21 @@ class MainActivity : AppCompatActivity() {
 
         content.addView(Button(this).apply { text = "CONNECT ANGEL ONE LIVE"; setOnClickListener { saveAndConnect() } })
         content.addView(Button(this).apply { text = "REFRESH STATUS"; setOnClickListener { health() } })
+        content.addView(label("INDEX DATA", 18))
+        val tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        tabs.addView(Button(this).apply { text = "NSE / BSE"; setOnClickListener { selectedExchange = "NSE"; loadIndexes() } }, LinearLayout.LayoutParams(0, -2, 1f))
+        tabs.addView(Button(this).apply { text = "MCX"; setOnClickListener { selectedExchange = "MCX"; loadIndexes() } }, LinearLayout.LayoutParams(0, -2, 1f))
+        content.addView(tabs)
+        indexSelector = Spinner(this)
+        content.addView(indexSelector)
+        nseStatus = label("NSE data: checking...", 13)
+        content.addView(nseStatus)
+        indexSelector.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+                if (position in indexSymbols.indices) fetchDashboardSnapshot(indexSymbols[position])
+            }
+        }
         snapshot = label("Waiting for live terminal snapshot...", 13)
         content.addView(snapshot)
         content.addView(label("Security: Angel credentials are sent only to your configured HTTPS backend. The APK never calls Angel directly. API orders are not implemented.", 12))
@@ -103,6 +124,59 @@ class MainActivity : AppCompatActivity() {
                         val msg = detail?.optString("message") ?: json?.optString("detail") ?: ("HTTP " + response.code)
                         status.text = "Angel: REJECTED • " + msg
                     }
+                }
+            }
+        })
+    }
+
+    private fun loadIndexes() {
+        val req = Request.Builder().url(baseUrl() + "/api/indexes").headers(headers()).get().build()
+        http.newCall(req).enqueue(object : Callback {
+            override fun onFailure(call: Call, ex: java.io.IOException) { runOnUiThread { nseStatus.text = "Index catalog unavailable • " + (ex.message ?: "network error") } }
+            override fun onResponse(call: Call, response: Response) {
+                val raw = response.body?.string().orEmpty()
+                val json = runCatching { JSONObject(raw) }.getOrNull()
+                val arr = json?.optJSONObject("exchanges")?.optJSONArray(selectedExchange)
+                val symbols = mutableListOf<String>(); val names = mutableListOf<String>()
+                if (arr != null) for (i in 0 until arr.length()) {
+                    val item = arr.optJSONObject(i) ?: continue
+                    symbols.add(item.optString("symbol"))
+                    names.add(item.optString("name") + " • " + item.optString("exchange"))
+                }
+                runOnUiThread {
+                    indexSymbols.clear(); indexSymbols.addAll(symbols)
+                    indexNames.clear(); indexNames.addAll(names)
+                    indexSelector.adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, indexNames)
+                    if (indexSymbols.isNotEmpty()) fetchDashboardSnapshot(indexSymbols[0])
+                }
+            }
+        })
+    }
+
+    private fun fetchDashboardSnapshot(symbol: String) {
+        val encoded = java.net.URLEncoder.encode(symbol, "UTF-8")
+        val req = Request.Builder().url(baseUrl() + "/api/snapshot?symbol=" + encoded).headers(headers()).get().build()
+        http.newCall(req).enqueue(object : Callback {
+            override fun onFailure(call: Call, ex: java.io.IOException) { runOnUiThread { nseStatus.text = "NSE data: unavailable • " + (ex.message ?: "network error") } }
+            override fun onResponse(call: Call, response: Response) {
+                val raw = response.body?.string().orEmpty()
+                val j = runCatching { JSONObject(raw) }.getOrNull()
+                runOnUiThread {
+                    if (j == null || !response.isSuccessful) {
+                        nseStatus.text = "NSE data: HTTP " + response.code
+                        return@runOnUiThread
+                    }
+                    val source = j.optString("source_status", "UNAVAILABLE")
+                    val symbolName = j.optString("symbol", symbol)
+                    val spot = j.opt("underlying_ltp")
+                    val age = j.opt("last_nse_fetch_age_sec")
+                    nseStatus.text = when (source) {
+                        "LIVE" -> "🟢 LIVE • NSE • " + symbolName + " • LTP=" + spot
+                        "LAST_FETCH" -> "🟡 LAST NSE FETCH • " + symbolName + " • age=" + (age ?: "--") + "s • LTP=" + spot
+                        "INDEX_CATALOG" -> "🟡 " + symbolName + " • separate MCX/BSE catalog; NSE fallback not applicable"
+                        else -> "🔴 NSE DATA UNAVAILABLE • " + symbolName
+                    }
+                    snapshot.text = "Dashboard • " + symbolName + " • ATM=" + j.opt("atm") + " • PCR=" + j.opt("pcr") + " • Trend=" + j.optString("trend", "DATA UNAVAILABLE")
                 }
             }
         })
