@@ -3,7 +3,6 @@ package com.vsp1.trading
 data class TerminalTab(val title: String, val icon: String)
 
 object TerminalTabs {
-    const val modeLabel = "PAPER / DEMO"
     val items = listOf(
         TerminalTab("Dashboard","⌂"), TerminalTab("Market","◉"), TerminalTab("Watchlist","★"),
         TerminalTab("Option Chain","▤"), TerminalTab("OI Analysis","OI"), TerminalTab("Greeks","Δ"),
